@@ -20,16 +20,20 @@ pipeline {
             }
         }
 
-        stage('Test') {
-            steps {
-                dir('sample-app') {
-                    sh '''
-                        python3 -m pip install -r requirements.txt
-                        python3 -m unittest -v test_app.py
-                    '''
-                }
-            }
+        
+stage('Test') {
+    steps {
+        dir('sample-app') {
+            sh '''
+                python3 -m venv .venv
+                .venv/bin/python -m pip install --upgrade pip
+                .venv/bin/python -m pip install -r requirements.txt
+                .venv/bin/python -m unittest -v test_app.py
+            '''
         }
+    }
+}
+
 
         stage('Build Docker Image') {
             steps {
