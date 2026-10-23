@@ -1,4 +1,4 @@
-
+```groovy
 pipeline {
     agent any
 
@@ -16,16 +16,16 @@ pipeline {
         stage('Build') {
             steps {
                 echo 'Checking application files...'
-                bat 'dir sample-app'
+                sh 'ls -la sample-app'
             }
         }
 
         stage('Test') {
             steps {
                 dir('sample-app') {
-                    bat '''
-                        python -m pip install -r requirements.txt
-                        python -m unittest -v test_app.py
+                    sh '''
+                        python3 -m pip install -r requirements.txt
+                        python3 -m unittest -v test_app.py
                     '''
                 }
             }
@@ -33,24 +33,36 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                bat 'docker build -t %IMAGE_NAME%:latest sample-app'
+                sh 'docker build -t ${IMAGE_NAME}:latest sample-app'
             }
         }
 
         stage('Deploy') {
             steps {
-                bat '''
-                    docker rm -f %CONTAINER_NAME% 2>nul
-                    if errorlevel 1 exit /b 1
-                    docker run -d --name %CONTAINER_NAME% -p %APP_PORT%:5000 %IMAGE_NAME%:latest
+                sh '''
+                    docker rm -f "$CONTAINER_NAME" || true
+                    docker run -d \
+                        --name "$CONTAINER_NAME" \
+                        -p "$APP_PORT":5000 \
+                        "$IMAGE_NAME":latest
                 '''
             }
         }
 
         stage('Verify') {
             steps {
-                bat '''
-                    powershell -NoProfile -Command "$ok=$false; for($i=0;$i -lt 15;$i++){try{$r=Invoke-RestMethod http://localhost:5000/health -TimeoutSec 2; if($r.status -eq 'healthy'){$ok=$true;break}}catch{}; Start-Sleep -Seconds 2}; if(-not $ok){docker logs %CONTAINER_NAME%; exit 1}; Write-Host 'Health check passed'"
+                sh '''
+                    for i in $(seq 1 15); do
+                        if python3 -c "import urllib.request; print(urllib.request.urlopen('http://localhost:${APP_PORT}/health', timeout=2).read().decode())"; then
+                            echo "Health check passed"
+                            exit 0
+                        fi
+                        sleep 2
+                    done
+
+                    docker logs "$CONTAINER_NAME" || true
+                    echo "Health check failed"
+                    exit 1
                 '''
             }
         }
@@ -65,3 +77,4 @@ pipeline {
         }
     }
 }
+```
