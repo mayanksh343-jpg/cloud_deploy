@@ -9,7 +9,7 @@ pipeline {
     environment {
         IMAGE_NAME = 'clouddeploy-app'
         CONTAINER_NAME = 'clouddeploy-test'
-        APP_PORT = '5000'
+        APP_PORT = '5001'
     }
 
     stages {
