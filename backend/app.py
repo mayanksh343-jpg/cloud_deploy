@@ -33,7 +33,7 @@ def validate_repo_url(value):
     if not isinstance(value, str) or len(value) > 300:
         return None, "Enter a valid GitHub repository URL."
     parsed = urlparse(value.strip())
-    if parsed.scheme != "https" or parsed.hostname != "github.com" or parsed.username or parsed.password or parsed.port:
+    if parsed.scheme != "https" or parsed.netloc.lower() != "github.com":
         return None, "Only public HTTPS GitHub repository URLs are supported (https://github.com/owner/repo)."
     if parsed.query or parsed.fragment:
         return None, "Repository URL must not contain query parameters or fragments."
@@ -111,6 +111,20 @@ def deploy():
     target = body.get("target", "local")
     if target not in ("local", "aws"):
         return jsonify({"error": "Target must be 'local' or 'aws'."}), 400
+
+    # AWS builds run repository-controlled Dockerfiles with deployment permissions.
+    # Only allow repositories explicitly approved by the operator for AWS.
+    if target == "aws":
+        allowed = {
+            item.strip().lower()
+            for item in os.getenv("ALLOWED_AWS_REPOS", "").split(",")
+            if item.strip()
+        }
+        repo_slug = repo_url.removeprefix("https://github.com/").removesuffix(".git").lower()
+        if not allowed or repo_slug not in allowed:
+            return jsonify({
+                "error": "This repository is not approved for AWS deployment. Add its owner/repo slug to ALLOWED_AWS_REPOS in backend/.env only after reviewing the code."
+            }), 403
 
     try:
         response = jenkins_request(
